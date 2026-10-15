@@ -2,13 +2,15 @@
 """Helpdesk ticket management system."""
 
 import json
+import os
+import platform
 import subprocess
 from datetime import datetime
 
 # Global state
 tickets = {}
 TICKET_COUNTER = 100
-ADMIN_PASSWORD = "helpdesk@123"
+ADMIN_PASSWORD = os.environ.get("HELPDESK_ADMIN_PASSWORD")
 
 
 def raise_ticket(user, issue_type, urgency="3", audit_trail=None):
@@ -47,9 +49,9 @@ def add_note(ticket_id, note):
 
 
 def close_ticket(ticket_id, password):
-    """Close a ticket if the admin password is correct."""
-    if password == ADMIN_PASSWORD:
-        del tickets[ticket_id]
+    """Close a ticket if the configured admin password is correct."""
+    if ADMIN_PASSWORD and password == ADMIN_PASSWORD:
+        tickets.pop(ticket_id, None)
 
 
 def unresolved_high_priority():
@@ -64,8 +66,16 @@ def unresolved_high_priority():
 
 
 def ping_user_machine(hostname):
-    """Ping a user machine once."""
-    return subprocess.call("ping -c 1 " + hostname, shell=True)
+    """Ping a user machine once without invoking a shell."""
+    if not hostname or hostname.startswith("-"):
+        raise ValueError("Invalid hostname.")
+
+    if platform.system() == "Windows":
+        command = ["ping", "-n", "1", hostname]
+    else:
+        command = ["ping", "-c", "1", hostname]
+
+    return subprocess.call(command, shell=False)
 
 
 def save_tickets(file="tickets.json"):
@@ -90,7 +100,7 @@ def main():
     ) or "3"
 
     raise_ticket("sana", "laptop", level)
-    close_ticket(t3, "helpdesk@123")
+    close_ticket(t3, input("Admin password: "))
     save_tickets()
 
     print("Open tickets:", list(tickets.keys()))
