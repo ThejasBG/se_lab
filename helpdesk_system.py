@@ -3,8 +3,8 @@
 
 import json
 import os
-import platform
-import subprocess
+import socket
+import time
 from datetime import datetime
 
 # Global state
@@ -66,22 +66,30 @@ def unresolved_high_priority():
 
 
 def ping_user_machine(hostname):
-    """Ping a user machine once without invoking a shell."""
+    """Resolve a hostname and measure the DNS lookup time."""
     if not hostname or hostname.startswith("-"):
         raise ValueError("Invalid hostname.")
 
-    if platform.system() == "Windows":
-        command = ["ping", "-n", "1", hostname]
-    else:
-        command = ["ping", "-c", "1", hostname]
+    start_time = time.perf_counter()
 
-    return subprocess.call(command, shell=False)
+    try:
+        socket.getaddrinfo(hostname, None)
+        elapsed_time = time.perf_counter() - start_time
+        print(
+            f"Host resolved successfully in "
+            f"{elapsed_time:.4f} seconds."
+        )
+        return 0
+
+    except socket.gaierror:
+        print("Hostname could not be resolved.")
+        return 1
 
 
 def save_tickets(file="tickets.json"):
     """Save all tickets to a JSON file."""
     with open(file, "w", encoding="utf-8") as ticket_file:
-        ticket_file.write(json.dumps(tickets))
+        json.dump(tickets, ticket_file)
 
 
 def main():
@@ -93,16 +101,21 @@ def main():
     assign_ticket(t1, "Tech-Kiran")
     add_note(999, "Called user")
 
-    print("Unassigned high priority:", unresolved_high_priority())
+    print(
+        "Unassigned high priority:",
+        unresolved_high_priority(),
+    )
 
     level = input(
         "Urgency for a new laptop ticket (1-5, Enter for 3): "
     ) or "3"
 
     raise_ticket("sana", "laptop", level)
-    close_ticket(t3, input("Admin password: "))
-    save_tickets()
 
+    password = input("Admin password: ")
+    close_ticket(t3, password)
+
+    save_tickets()
     print("Open tickets:", list(tickets.keys()))
 
 
